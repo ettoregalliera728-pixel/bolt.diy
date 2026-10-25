@@ -1,7 +1,12 @@
+Failed to create stream fd: Operation not permitted
+Failed to create stream fd: Operation not permitted
+Failed to create stream fd: Operation not permitted
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { reactRouter } from '@react-router/dev/vite';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { needsBrowserPolyfills } from './scripts/browser-polyfill-filter';
 import UnoCSS from 'unocss/vite';
 import { defineConfig, type ViteDevServer } from 'vite';
 import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
@@ -228,8 +233,7 @@ function browserPolyfills() {
     `globalThis.global ??= globalThis;`,
   ].join('\n');
 
-  /* Only touch modules that actually reference one of the globals. */
-  const needsPolyfill = /(^|[^\w.$])(Buffer|process|global)([^\w$]|$)/;
+  const appRoot = join(dirname(fileURLToPath(import.meta.url)), 'app');
 
   /*
    * Vite externalizes Node builtins for the browser before `resolve.alias` is
@@ -257,17 +261,9 @@ function browserPolyfills() {
       return builtinAliases[source] ?? null;
     },
     transform(code: string, id: string) {
-      // Skip node_modules except for specific ones that need polyfills
-      if (id.includes('node_modules')) {
-        // Only inject polyfills for path-browserify and other packages that need them
-        if (!id.includes('path-browserify')) {
-          return null;
-        }
-      } else if (!/\.[cm]?[jt]sx?$/.test(id.split('?')[0])) {
-        return null;
-      }
-
-      if (!needsPolyfill.test(code)) {
+      // Never inject into Rolldown's virtual runtime. Its helpers are required
+      // by the shims themselves: injecting shims there creates a startup cycle.
+      if (!needsBrowserPolyfills(code, id, appRoot)) {
         return null;
       }
 
