@@ -1,6 +1,3 @@
-Failed to create stream fd: Operation not permitted
-Failed to create stream fd: Operation not permitted
-Failed to create stream fd: Operation not permitted
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { needsBrowserPolyfills } from '../scripts/browser-polyfill-filter.ts';
