@@ -19,25 +19,28 @@ export function prebootWebContainer(): void {
     return; // Already booting
   }
 
-  // Start the boot process in the background
-  webContainerBootPromise = import('@webcontainer/api')
-    .then(({ WebContainer: webContainerAPI }) => {
-      console.log('[WEBCONTAINER] API loaded, starting boot...');
-      return webContainerAPI.boot();
-    })
+  // Reuse the application's single boot promise, including its workdir,
+  // preview inspector and error listeners. Booting the API here separately
+  // races app/lib/webcontainer and fails: only one instance is allowed.
+  const bootPromise = import('../webcontainer')
+    .then(({ webcontainer }) => webcontainer)
     .then((instance) => {
       console.log('[WEBCONTAINER] Booted successfully');
       webContainerInstance = instance;
 
       return instance;
-    })
-    .catch((error) => {
-      console.error('[WEBCONTAINER] Boot failed:', error);
-
-      // Reset so it can be retried
-      webContainerBootPromise = null;
-      throw error;
     });
+  webContainerBootPromise = bootPromise;
+
+  // preboot is intentionally fire-and-forget, so observe failures without
+  // creating an unhandled rejection. getWebContainer still gets the original
+  // rejecting promise when it is awaiting this boot.
+  void bootPromise.catch((error) => {
+    console.error('[WEBCONTAINER] Boot failed:', error);
+    if (webContainerBootPromise === bootPromise) {
+      webContainerBootPromise = null;
+    }
+  });
 }
 
 /**
